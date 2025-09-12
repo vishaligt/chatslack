@@ -29,6 +29,9 @@ app.use((req, res, next) => {
     capturedJsonResponse = bodyJson;
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
+app.get("/", (req, res) => {
+  res.json({ status: "ok", message: "ChatSlack API running 🚀" });
+});
 
   res.on("finish", () => {
     const duration = Date.now() - start;
