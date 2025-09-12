@@ -4,9 +4,15 @@ import { setupVite, serveStatic, log } from "./vite";
 import { db } from "./db.mongo";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
+import cors from "cors";
 dotenv.config();
 const app = express();
 
+app.use(cors({
+  origin: "*", // allow all origins, or replace "*" with your frontend URL
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 const DATABASE_URL = process.env.DATABASE_URL;
