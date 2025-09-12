@@ -9,16 +9,16 @@ const app = express();
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
- const DATABASE_URL = process.env.DATABASE_URL || "mongodb://127.0.0.1:27017/chatbridge";
- 
- if (!DATABASE_URL) {
-   throw new Error("DATABASE_URL must be set");
- }
- 
- mongoose.connect(DATABASE_URL)
-   .then(() => console.log("✅ MongoDB connected"))
-   .catch((err) => console.error("❌ MongoDB connection error:", err));
- 
+const DATABASE_URL = process.env.DATABASE_URL;
+
+if (!DATABASE_URL) {
+  throw new Error("DATABASE_URL must be set");
+}
+
+mongoose.connect(DATABASE_URL)
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch((err) => console.error("❌ MongoDB connection error:", err));
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
@@ -63,11 +63,13 @@ app.use((req, res, next) => {
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
-  if (app.get("env") === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
+ if (app.get("env") === "development") {
+  await setupVite(app, server);
+} else {
+  // serveStatic(app); ❌ disable this if no frontend
+  log("Skipping static frontend serving (API-only mode)");
+}
+
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
