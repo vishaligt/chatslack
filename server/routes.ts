@@ -74,7 +74,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ✅ Slack events route (can now access io)
   // ✅ Slack events route (can now access io)
   app.post("/api/slack/events", async (req, res) => {
-    console.log("📥 Incoming Slack event:", JSON.stringify(req.body));
+ //   console.log("📥 Incoming Slack event:", JSON.stringify(req.body));
 
     const { type, challenge, event } = req.body;
 
@@ -128,11 +128,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             createdAt: new Date(),
           };
 
-          // Save to DB
-          await storage.createMessage(messageData);
-          console.log("✅ Slack message saved to DB:", messageData);
+        //  Save to DB
+        await storage.createMessage(messageData);
+        console.log("✅ Slack message saved to DB:", messageData);
 
-          // Forward to frontend via Socket.IO
+         // Forward to frontend via Socket.IO
           io.to(conversation.id).emit("new_message", messageData);
           console.log("📤 Slack message forwarded to frontend:", conversation.id);
         } catch (err) {
@@ -175,8 +175,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/conversations/:conversationId/messages", async (req, res) => {
     try {
-      const messages = await storage.getConversationMessages(req.params.conversationId);
-      res.json(messages);
+    //  const messages = await storage.getConversationMessages(req.params.conversationId);
+      res.json("messages");
     } catch (err) {
       res.status(500).json({ error: "Failed to fetch messages" });
     }
@@ -229,12 +229,44 @@ socket.on("start_conversation", async ({ userId, userEmail }) => {
     socket.join(convId);
 
     // Fetch old messages
-    const messages = await storage.getConversationMessages(convId);
+  //  const messages = await storage.getConversationMessages(convId);
+     let messages: any[] = [];
 
+    if ( conversation?.slackChannelId && conversation.slackThreadTs) {
+      const slackHistory = await slack.conversations.replies({
+        channel: conversation.slackChannelId,
+        ts: conversation.slackThreadTs,
+      });
+
+    messages = slackHistory.messages
+  ?.filter(msg => msg.ts)  // only keep messages with ts
+  .map(msg => ({
+    id: msg.ts!,
+    content: msg.text || "",
+    senderType: msg.user ? "support" : "ai",
+    senderName: msg.user ? "Slack Admin" : "AI Assistant",
+    createdAt: new Date(Number(msg.ts!.split(".")[0]) * 1000),
+  })) || [];
+    }
+    
+    const dbMessages = await storage.getConversationMessages(convId); 
+// Filter out duplicates if you want, e.g., messages already in Slack
+const combinedMessages = [
+  ...messages,
+  ...dbMessages.map(msg => ({
+    id: msg.id,
+    content: msg.content,
+    senderType: msg.senderType,
+    senderName: msg.senderName,
+    createdAt: msg.createdAt,
+    metadata: msg.metadata,
+    isAI: msg.senderType === "ai",
+  }))
+];
     // Emit normalized conversation
     socket.emit("conversation_started", {
       conversation: { ...conversation, id: convId },
-      messages,
+      messages: combinedMessages,
     });
   } catch (err) {
     console.error("Error starting conversation:", err);
@@ -280,8 +312,16 @@ socket.on("start_conversation", async ({ userId, userEmail }) => {
           senderName: "You",
           content,
         });
+        //   const userMessage =  {
+        //   id: Date.now().toString(),
+        //   conversationId,
+        //   senderId: userId,
+        //   senderType: "user",
+        //   senderName: "You",
+        //   content,
+        // };
 
-        console.log("✅ Message saved:", userMessage);
+        // console.log("✅ Message saved:", userMessage);
 
         // ✅ Fetch conversation for Slack mapping
         const conversation = await storage.getConversation(conversationId);
@@ -298,7 +338,7 @@ socket.on("start_conversation", async ({ userId, userEmail }) => {
               conversationId,
               userEmail,
               channelId: conversation.slackChannelId,
-              threadTs: conversation.slackThreadTs || undefined,
+            //  threadTs: conversation.slackThreadTs || undefined,
             });
 
             console.log("📤 Sent to Slack, ts:", slackTs);
@@ -327,19 +367,35 @@ socket.on("start_conversation", async ({ userId, userEmail }) => {
           console.log("🤖 AI response generated:", aiResponse);
 
           if (aiResponse.content && aiResponse.confidence > 0.3) {
-            const aiMessage = await storage.createMessage({
-              conversationId,
-              senderId: null,
-              senderType: "ai",
-              senderName: "AI Assistant",
-              content: aiResponse.content,
-              metadata: {
-                confidence: aiResponse.confidence,
-                shouldTransferToHuman: aiResponse.shouldTransferToHuman,
-              },
-            });
+            // const aiMessage = await storage.createMessage({
+            //   conversationId,
+            //   senderId: null,
+            //   senderType: "ai",
+            //   senderName: "AI Assistant",
+            //   content: aiResponse.content,
+            //   metadata: {
+            //     confidence: aiResponse.confidence,
+            //     shouldTransferToHuman: aiResponse.shouldTransferToHuman,
+            //   },
+            // });
 
-            console.log("✅ AI Message saved:", aiMessage);
+            // console.log("✅ AI Message saved:", aiMessage);
+
+            const aiMessage = {
+  id: Date.now().toString(),
+  conversationId,
+  senderId: null,
+  senderType: "ai",
+  senderName: "AI Assistant",
+  content: aiResponse.content,
+  createdAt: new Date(),
+  isAI: true,
+  metadata: {
+    confidence: aiResponse.confidence,
+    shouldTransferToHuman: aiResponse.shouldTransferToHuman,
+  },
+};
+
 
             // Emit AI message with slight delay
             setTimeout(() => {
