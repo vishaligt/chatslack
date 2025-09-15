@@ -1,7 +1,7 @@
 import express, { type Request, Response, NextFunction } from "express";
-import { registerRoutes } from "./routes";
+import { registerRoutes } from "./slackChatController";
 import { setupVite, serveStatic, log } from "./vite";
-import { db } from "./db.mongo";
+import { db } from "./dbQuerys";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
@@ -35,9 +35,9 @@ app.use((req, res, next) => {
     capturedJsonResponse = bodyJson;
     return originalResJson.apply(res, [bodyJson, ...args]);
   };
-app.get("/", (req, res) => {
-  res.json({ status: "ok", message: "ChatSlack API running 🚀" });
-});
+  app.get("/", (req, res) => {
+    res.json({ status: "ok", message: "ChatSlack API running 🚀" });
+  });
 
   res.on("finish", () => {
     const duration = Date.now() - start;
@@ -72,12 +72,12 @@ app.get("/", (req, res) => {
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
- if (app.get("env") === "development") {
-  await setupVite(app, server);
-} else {
-  // serveStatic(app); ❌ disable this if no frontend
-  log("Skipping static frontend serving (API-only mode)");
-}
+  if (app.get("env") === "development") {
+    await setupVite(app, server);
+  } else {
+    // serveStatic(app); ❌ disable this if no frontend
+    log("Skipping static frontend serving (API-only mode)");
+  }
 
 
   // ALWAYS serve the app on the port specified in the environment variable PORT
