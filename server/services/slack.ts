@@ -1,5 +1,5 @@
 import { WebClient } from "@slack/web-api";
-import { storage } from "../slackChatModel";
+import { storage } from "../dbQuerys";
 import dotenv from "dotenv";
 dotenv.config();
 const SLACK_API_TOKEN = process.env.SLACK_API_TOKEN;

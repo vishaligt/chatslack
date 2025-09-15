@@ -3,22 +3,18 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { Server as SocketIOServer } from "socket.io";
-// import { storage } from "./storage.mongo";
 import { sendMessageToSlack, setupSlackEventHandlers } from "./services/slack";
 import { generateAutoReply } from "./services/openai";
 import { insertUserSchema } from "@shared/schema";
 import { WebClient } from "@slack/web-api";
 import dotenv from "dotenv";
-import { storage } from "./slackChatModel";
-
+import { storage } from "./dbQuerys";
 dotenv.config();
-
 const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
 
 
 export async function createSlackChannelForUser(userId: string, email: string) {
   const channelName = `chat-${userId.substring(0, 8)}`;
-
   try {
     // Try creating a new channel
     const channel = await slack.conversations.create({ name: channelName, is_private: false });
@@ -149,20 +145,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
   // Other REST routes
-  app.post("/api/users", async (req, res) => {
-    try {
-      const userData = insertUserSchema.parse(req.body);
+app.post("/api/users", async (req, res) => {
+  try {
+    console.log("📩 Incoming request body:", req.body);
 
-      const existingUser = await storage.getUserByEmail(userData.email);
-      if (existingUser) return res.json(existingUser);
+    const userData = insertUserSchema.parse(req.body);
+    console.log("✅ Parsed user data:", userData);
 
-      const user = await storage.createUser(userData);
-      res.json(user);
-    } catch (err) {
-      console.error("Error creating user:", err);
-      res.status(400).json({ error: "Failed to create user" });
+    const existingUser = await storage.getUserByEmail(userData.email);
+    console.log("🔎 Existing user lookup:", existingUser);
+
+    if (existingUser) {
+      console.log("⚠️ User already exists, returning existing user");
+      return res.json(existingUser);
     }
-  });
+
+    const user = await storage.createUser(userData);
+    console.log("🎉 New user created:", user);
+
+    res.json(user);
+  } catch (err) {
+    if (err.errors) {
+      // Likely Zod validation error
+      console.error("❌ Validation error:", err.errors);
+    } else {
+      console.error("❌ Unexpected error creating user:", err);
+    }
+
+    res.status(400).json({ error: "Failed to create user" });
+  }
+});
+
 
   app.get("/api/users/:userId/conversations", async (req, res) => {
     try {
