@@ -11,10 +11,17 @@ import dotenv from "dotenv";
 import { storage } from "./dbQuerys";
 dotenv.config();
 const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
+function sanitizeChannelName(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]/g, "-") // replace invalid chars with `-`
+    .substring(0, 21);            // Slack requires max length safeguard
+}
 
 
 export async function createSlackChannelForUser(userId: string, email: string , username : string) {
-  const channelName = `chat-${username}`;
+   const channelName = sanitizeChannelName(`chat-${username}`);
+
   try {
     // Try creating a new channel
     const channel = await slack.conversations.create({ name: channelName, is_private: false });
