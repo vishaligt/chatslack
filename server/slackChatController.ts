@@ -435,7 +435,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
         socket.emit("error", { message: "Failed to send message" });
       }
     });
+    socket.on("delete_conversation", async ({ conversationId, deletedBy }) => {
+  try {
+    console.log("🗑️ Deleting conversation:", conversationId);
 
+    // 1. Find conversation in DB
+    const conversation = await  storage.getConversation(conversationId);
+    if (!conversation) {
+      return socket.emit("error", { message: "Conversation not found" });
+    }
+
+    // 2. Rename Slack channel (if exists)
+    if (conversation.slackChannelId) {
+      try {
+        await slack.chat.postMessage({
+          channel: conversation.slackChannelId,
+          text: `🗑️ Conversation deleted by *${deletedBy}*`,
+        });
+
+        await slack.conversations.rename({
+          channel: conversation.slackChannelId,
+          name: `deleted-${conversationId}`,
+        });
+
+        console.log(`✅ Slack channel renamed: deleted-${conversationId}`);
+      }   catch (err: unknown) {
+  console.error("⚠️ Slack error:", err instanceof Error ? err.message : err);
+}
+
+    }
+
+    // 3. Delete conversation from DB
+    await storage.deleteConversation(conversationId);
+    console.log(`✅ Conversation ${conversationId} deleted from DB`);
+
+
+     // 3.1. Delete conversation from DB
+    await storage.deleteConversationMessages(conversationId);
+    console.log(`✅ Conversation messages ${conversationId} deleted from DB`);
+
+    // 4. Notify frontend clients
+    io.to(conversationId).emit("conversation_deleted", {
+      conversationId,
+      deletedBy,
+    });
+
+  } catch (err) {
+    console.error("Error deleting conversation:", err);
+    socket.emit("error", { message: "Failed to delete conversation" });
+  }
+});
   });
 
   // Slack handlers (optional)

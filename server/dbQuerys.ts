@@ -19,6 +19,8 @@ export interface IStorage {
   // Messages
   getConversationMessages(conversationId: string): Promise<any[]>;
   createMessage(message: any): Promise<any>;
+  deleteConversationMessages(id: string): Promise <boolean>;
+  deleteConversation(id: string): Promise<boolean>;
   updateMessage(id: string, updates: Partial<any>): Promise<any>;
 }
 
@@ -108,11 +110,21 @@ export class MongoDBStorage implements IStorage {
       { new: true }
     );
   }
+async deleteConversation(id: string): Promise<boolean> {
+  const result = await Conversation.findByIdAndDelete(id);
+  return result !== null; // true if deleted, false if not found
+}
 
   // 🔹 MESSAGES
   async getConversationMessages(conversationId: string): Promise<any[]> {
     return await Message.find({ conversationId }).sort({ createdAt: 1 });
   }
+
+ async deleteConversationMessages(conversationId: string): Promise<boolean> {
+  const result = await Message.deleteMany({ conversationId });
+  return result.deletedCount > 0; // ✅ true if at least 1 message deleted
+}
+
 
   async createMessage(messageData: any): Promise<any> {
     const message = new Message(messageData);
