@@ -11,11 +11,15 @@ import dotenv from "dotenv";
 import { storage } from "./dbQuerys";
 dotenv.config();
 const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
-function sanitizeChannelName(input: string): string {
-  return input
-    .toLowerCase()
-    .replace(/[^a-z0-9-_]/g, "-") // replace invalid chars with `-`
-    .substring(0, 21);            // Slack requires max length safeguard
+ function sanitizeChannelName(input: string): string {
+  const randomNum = Math.floor(100 + Math.random() * 900); // ✅ always 100–999
+  return (
+    input
+      .toLowerCase()
+      .replace(/[^a-z0-9-_]/g, "-") // replace invalid chars with `-`
+      .substring(0, 18) +           // leave space for 3 digits
+    `-${randomNum}`
+  );
 }
 
 
