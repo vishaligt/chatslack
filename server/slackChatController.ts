@@ -13,8 +13,8 @@ dotenv.config();
 const slack = new WebClient(process.env.SLACK_BOT_TOKEN);
 
 
-export async function createSlackChannelForUser(userId: string, email: string) {
-  const channelName = `chat-${userId.substring(0, 8)}`;
+export async function createSlackChannelForUser(userId: string, email: string , username : string) {
+  const channelName = `chat-${username}`;
   try {
     // Try creating a new channel
     const channel = await slack.conversations.create({ name: channelName, is_private: false });
@@ -145,37 +145,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
 
   // Other REST routes
-app.post("/api/users", async (req, res) => {
-  try {
-    console.log("📩 Incoming request body:", req.body);
+  app.post("/api/users", async (req, res) => {
+    try {
+      const userData = insertUserSchema.parse(req.body);
 
-    const userData = insertUserSchema.parse(req.body);
-    console.log("✅ Parsed user data:", userData);
+      const existingUser = await storage.getUserByEmail(userData.email);
+      if (existingUser) return res.json(existingUser);
 
-    const existingUser = await storage.getUserByEmail(userData.email);
-    console.log("🔎 Existing user lookup:", existingUser);
-
-    if (existingUser) {
-      console.log("⚠️ User already exists, returning existing user");
-      return res.json(existingUser);
+      const user = await storage.createUser(userData);
+      res.json(user);
+    } catch (err) {
+      console.error("Error creating user:", err);
+      res.status(400).json({ error: "Failed to create user" });
     }
-
-    const user = await storage.createUser(userData);
-    console.log("🎉 New user created:", user);
-
-    res.json(user);
-  } catch (err) {
-    if (err.errors) {
-      // Likely Zod validation error
-      console.error("❌ Validation error:", err.errors);
-    } else {
-      console.error("❌ Unexpected error creating user:", err);
-    }
-
-    res.status(400).json({ error: "Failed to create user" });
-  }
-});
-
+  });
 
   app.get("/api/users/:userId/conversations", async (req, res) => {
     try {
@@ -185,9 +168,7 @@ app.post("/api/users", async (req, res) => {
       res.status(500).json({ error: "Failed to fetch conversations" });
     }
   });
-   
 
-  // 
   app.get("/api/conversations/:conversationId/messages", async (req, res) => {
     try {
       //  const messages = await storage.getConversationMessages(req.params.conversationId);
@@ -205,10 +186,10 @@ app.post("/api/users", async (req, res) => {
       if (!userId) return;
       socket.join(userId);
     });
-    socket.on("start_conversation", async ({ userId, userEmail }) => {
+    socket.on("start_conversation", async ({ userId, userEmail , username }) => {
       try {
         // Check if an active conversation exists for this user
-        console.log("Starting conversation for userId:", userId, "email:", userEmail);
+        console.log("Starting conversation for userId:", userId, "email:", userEmail , "username : " ,  username  );
         let conversation = await storage.getActiveConversationByUser(userId);
         console.log("Active conversation for user:", conversation);
 
@@ -217,7 +198,7 @@ app.post("/api/users", async (req, res) => {
           conversation = await storage.createConversation({ userId, status: "active" });
 
           // Create (or reuse) Slack channel
-          const slackInfo = await createSlackChannelForUser(userId, userEmail);
+          const slackInfo = await createSlackChannelForUser(userId, userEmail, username);
 
           const convId = conversation?._id?.toString();
           if (!convId) {
